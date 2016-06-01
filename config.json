@@ -1,0 +1,36 @@
+{
+    "user_agent": "TellsAJokeBot/1.0 by /u/Rascal_Two for /u/palkiajack running everywhere under /u/TellsAJokeBot",
+    "username": "",
+    "password": "",
+    "subreddits": [
+
+    ],
+    "rates": {
+        "trello": 300,
+        "mentions": 60,
+        "reply": 60
+    },
+    "trello": {
+        "boards": [
+            {
+                "id": "",
+                "list": "Jokes"
+            }
+        ],
+        "auth": {
+            "required": false,
+            "key": "",
+            "token": ""
+        }
+    },
+    "phrases": [
+        "Tell me a joke",
+    ],
+    "reply_message": [
+        "Prefix",
+        "",
+        "{joke}",
+        "",
+        "Suffix"
+    ]
+}
