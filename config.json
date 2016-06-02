@@ -3,19 +3,23 @@
     "username": "",
     "password": "",
     "subreddits": [
-
+    ],
+    "ignored_users":[
+        "TerribleJokeBot"
     ],
     "rates": {
         "trello": 300,
         "mentions": 60,
-        "reply": 60
+        "reply": 60,
+        "io": 30
     },
+    "max_comments": 10000,
     "trello": {
         "boards": [
             {
                 "id": "",
                 "list": "Jokes"
-            }
+            },
         ],
         "auth": {
             "required": false,
@@ -24,13 +28,18 @@
         }
     },
     "phrases": [
-        "Tell me a joke",
+        "tell me a joke"
     ],
     "reply_message": [
-        "Prefix",
+        "[Parent]({parent.permalink})",
+        "",
+        "*****",
         "",
         "{joke}",
         "",
-        "Suffix"
+        "*****",
+        "",
+        "^Read ^about ^me ^at ^/r/TellsYouAJokeBot, ^developed ^by ^/u/Rascal_Two, ^ran ^by ^/u/palkiajack",
+        ""
     ]
 }

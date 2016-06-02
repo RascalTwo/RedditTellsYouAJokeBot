@@ -30,7 +30,7 @@ import logging.handlers
 import requests
 import threading
 
-class Loop():
+class Thread():
     def __init__(self, function, name=None):
         self.function = function
         thread = threading.Thread(target=self.function, name=name)
@@ -67,10 +67,31 @@ def handle_response(response_expected):
 
 class TellsYouAJokeBot(object):
     def __init__(self):
-        self.processed = self._load_file("data/processed.json", False)
+        self.processed = self._load_file("data/processed.json")
         self.config = self._load_file("config.json")
         self.trello = self._load_file("data/trello.json")
         self.jokes = self._load_file("data/jokes.json")
+
+        if self.processed == {}:
+            self.processed = {
+                "mentions": [],
+                "comments": []
+            }
+
+        self.io = {
+            "data/processed.json": {
+                "save": False,
+                "attribute": "processed"
+            },
+            "data/trello.json": {
+                "save": False,
+                "attribute": "trello"
+            },
+            "data/jokes.json": {
+                "save": False,
+                "attribute": "jokes"
+            },
+        }
 
         self.reply_to = []
 
@@ -94,17 +115,23 @@ class TellsYouAJokeBot(object):
                 return {}
             return []
 
-    def _save_file(self, name, data):
+    def _save_file(self, name, attribute):
         with open(name, "w") as writing_file:
-            writing_file.write(json.dumps(data))
+            writing_file.write(json.dumps(getattr(self, attribute)))
 
-    def run(self):
-        Loop(self._trello_loop, "Trello")
-        Loop(self._mentions_loop, "Mentions")
-        Loop(self._comment_loop, "Comments")
+    def mark_for_saving(self, name):
+        if not self.io[name]["save"]:
+            self.io[name]["save"] = True
+
+    def start(self):
+        self.running = True
+        Thread(self._io_loop, "IO")
+        Thread(self._trello_loop, "Trello")
+        Thread(self._mentions_loop, "Mentions")
+        Thread(self._comment_loop, "Comments")
 
         uptime = 0
-        while True:
+        while self.running:
             logger.info("Uptime: {}s".format(uptime))
             # Don't use a for loop on `reply_to`, it is constantly being changed.
             # Instead remove every element one by one
@@ -112,16 +139,22 @@ class TellsYouAJokeBot(object):
                 if len(self.reply_to) == 0:
                     break
                 thing = self.reply_to.pop(0)
-                logger.info(thing.id + " " + thing.author.name)
-                logger.info(self.get_random_joke())
-                #Here goes reply
+                reply = thing.reply(self.get_formated_message(thing))
+                logger.info("Replied to {} at {}".format(thing.author.name,
+                                                         thing.permalink))
+                self.add_comment_id(reply.id)
+                self.mark_for_saving("data/processed.json")
             time.sleep(self.config["rates"]["reply"])
+            uptime += self.config["rates"]["reply"]
+
+    def stop(self):
+        self.running = False
 
     def _trello_loop(self):
-        while True:
+        while self.running:
             if self.trello_changed():
                 logger.info("Trello change detected.")
-                self._save_file("data/trello.json", self.trello)
+                self.mark_for_saving("data/trello.json")
                 modified = False
                 for joke in self.get_trello_jokes():
                     if joke["id"] in self.jokes:
@@ -135,37 +168,58 @@ class TellsYouAJokeBot(object):
                         modified = True
                 if modified:
                     logger.info("Joke(s) updated.")
-                    self._save_file("data/jokes.json", self.jokes)
+                    self.mark_for_saving("data/jokes.json")
 
             time.sleep(self.config["rates"]["trello"])
 
     def _mentions_loop(self):
-        while True:
+        while self.running:
             for mention in self.reddit.get_mentions():
-                if mention.id in self.processed:
+                if mention.id in self.processed["mentions"]:
                     continue
                 logger.info("Username mentioned by " + mention.author.name + ".")
                 self.reply_to.append(mention)
-                self.processed.append(mention.id)
-                self._save_file("data/processed.json", self.processed)
+                self.processed["mentions"].append(mention.id)
+                self.mark_for_saving("data/processed.json")
             time.sleep(self.config["rates"]["mentions"])
 
     def _comment_loop(self):
         for comment in praw.helpers.comment_stream(self.reddit, "all+" + "+".join(self.config["subreddits"]), verbosity=0):
-            if comment.id in self.processed:
+            if not self.running:
+                break
+            if comment.id in self.processed["comments"]:
                 continue
-            if self.should_reply_to(comment.body):
+            if self.should_reply_to(comment):
                 logger.info("Valid phrase detected in '" + comment.author.name + "'s comment.")
                 self.reply_to.append(comment)
-                continue
-            self.processed.append(comment.id)
-            self._save_file("data/processed.json", self.processed)
+            self.add_comment_id(comment.id)
+            self.mark_for_saving("data/processed.json")
 
-    def should_reply_to(self, body):
+    def _io_loop(self):
+        while self.running:
+            for file in self.io:
+                if self.io[file]["save"]:
+                    self._save_file(file, self.io[file]["attribute"])
+                    self.io[file]["save"] = False
+            time.sleep(self.config["rates"]["io"])
+
+    def add_comment_id(self, id):
+        self.processed["comments"].append(id)
+        if len(self.processed["comments"]) > self.config["max_comments"]:
+            self.processed["comments"] = self.processed["comments"][int(self.config["max_comments"] / 2):-1]
+
+    def should_reply_to(self, comment):
+        if comment.author.name in self.config["ignored_users"]:
+            return False
         for phrase in self.config["phrases"]:
-            if phrase.lower() in body.lower():
+            if phrase.lower() in comment.body.lower():
                 return True
         return False
+
+    def get_formated_message(self, parent):
+        return ("\n".join(self.config["reply_message"])
+                .format(joke=self.get_random_joke(),
+                        parent=parent))
 
     @handle_response("json")
     def _get_children_of_parent(self, parent, auth, parent_type, child):
@@ -198,10 +252,8 @@ class TellsYouAJokeBot(object):
         auth = self._get_trello_auth(prefix="&")
         for board in self.config["trello"]["boards"]:
             board = self._get_last_activity(board["id"], "board", auth)
-            if board["id"] not in self.trello:
+            if board["id"] not in self.trello or self.trello[board["id"]] != board["dateLastActivity"]:
                 self.trello[board["id"]] = board["dateLastActivity"]
-                return True
-            if self.trello[board["id"]] != board["dateLastActivity"]:
                 return True
 
         return False
@@ -242,4 +294,14 @@ if __name__ == "__main__":
     console_logger.setFormatter(logging_format)
     logger.addHandler(console_logger)
 
-    TellsYouAJokeBot().run()
+    bot = TellsYouAJokeBot()
+    try:
+        bot.start()
+    except (KeyboardInterrupt, SystemExit):
+        bot.stop()
+        for file in bot.io:
+            if bot.io[file]["save"]:
+                logger.info("Saving data...")
+                bot._save_file(file, bot.io[file]["attribute"])
+            logger.info("Data saved.")
+        logger.info("Bot exited.")
