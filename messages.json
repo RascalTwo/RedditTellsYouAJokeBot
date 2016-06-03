@@ -1,0 +1,13 @@
+{
+    "uptime": "Uptime: {uptime}s",
+    "thread_init": "Thread {num}: {thread_name}",
+    "phrase_found": "Valid phrase found in {comment.author.name}s comment",
+    "regex_match": "Regex matched {comment.author.name}s comment {comment.permalink}",
+    "username_mention": "Username mentioned by {comment.author.name}",
+    "reply": "Replied to {comment.author.name}s comment {comment.permalink}",
+    "trello_change": "Trello change detected",
+    "jokes_updated": "Joke(s) updated",
+    "saving": "Saving data before shutdown...",
+    "saved": "Data saved",
+    "shutdown": "Bot shutdown"
+}

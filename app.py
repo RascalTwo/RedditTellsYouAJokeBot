@@ -21,6 +21,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+import re
 import json
 import time
 import praw
@@ -31,9 +32,9 @@ import requests
 import threading
 
 class Thread():
-    def __init__(self, function, name=None):
+    def __init__(self, function, name=None, args=None):
         self.function = function
-        thread = threading.Thread(target=self.function, name=name)
+        thread = threading.Thread(target=self.function, name=name, args=args)
         thread.daemon = True
         thread.start()
 
@@ -68,6 +69,7 @@ def handle_response(response_expected):
 class TellsYouAJokeBot(object):
     def __init__(self):
         self.processed = self._load_file("data/processed.json")
+        self.messages = self._load_file("messages.json")
         self.config = self._load_file("config.json")
         self.trello = self._load_file("data/trello.json")
         self.jokes = self._load_file("data/jokes.json")
@@ -93,6 +95,8 @@ class TellsYouAJokeBot(object):
             },
         }
 
+        self.uptime = 0
+
         self.reply_to = []
 
         self.reddit = praw.Reddit(self.config["user_agent"])
@@ -100,16 +104,19 @@ class TellsYouAJokeBot(object):
                           self.config["password"],
                           disable_warning="True")
 
-    def _load_file(self, name, return_dict=True):
+    def _load_file(self, name, new=True):
         try:
             with open(name, "r") as reading_file:
                 return json.loads(reading_file.read())
-        except:
-            with open(name, "w") as writing_file:
-                if return_dict:
-                    writing_file.write(json.dumps({}))
-                else:
-                    writing_file.write(json.dumps([]))
+        except Exception as exception:
+            if new:
+                with open(name, "w") as writing_file:
+                    if return_dict:
+                        writing_file.write(json.dumps({}))
+                    else:
+                        writing_file.write(json.dumps([]))
+            else:
+                logger.exception(exception)
 
             if return_dict:
                 return {}
@@ -125,83 +132,95 @@ class TellsYouAJokeBot(object):
 
     def start(self):
         self.running = True
-        Thread(self._io_loop, "IO")
-        Thread(self._trello_loop, "Trello")
-        Thread(self._mentions_loop, "Mentions")
-        Thread(self._comment_loop, "Comments")
+        rates = {}
+        for process in self.config["rates"]:
+            if self.config["rates"][process] in rates:
+                rates[self.config["rates"][process]].append(process.capitalize())
+            else:
+                rates[self.config["rates"][process]] = [process.capitalize()]
 
-        uptime = 0
-        while self.running:
-            logger.info("Uptime: {}s".format(uptime))
-            # Don't use a for loop on `reply_to`, it is constantly being changed.
-            # Instead remove every element one by one
-            while True:
-                if len(self.reply_to) == 0:
-                    break
-                thing = self.reply_to.pop(0)
-                reply = thing.reply(self.get_formated_message(thing))
-                logger.info("Replied to {} at {}".format(thing.author.name,
-                                                         thing.permalink))
-                self.add_comment_id(reply.id)
-                self.mark_for_saving("data/processed.json")
-            time.sleep(self.config["rates"]["reply"])
-            uptime += self.config["rates"]["reply"]
+        log(self.messages["thread_init"],
+            {"num": 1, "thread_name": "Comments"})
 
-    def stop(self):
-        self.running = False
+        for rate in rates:
+            rates[rate].sort()
+            thread_name = "-".join(rates[rate])
+            log(self.messages["thread_init"],
+                {"num": list(rates.keys()).index(rate) + 2, "thread_name": thread_name})
+            if self.config["shorten_thread_names"]:
+                thread_name = "-".join([process[0] for process in rates[rate]])
+            Thread(self._loop_runner,
+                   thread_name,
+                   [[getattr(self, "_{}_loop".format(loop.lower())) for loop in rates[rate]], rate])
 
-    def _trello_loop(self):
-        while self.running:
-            if self.trello_changed():
-                logger.info("Trello change detected.")
-                self.mark_for_saving("data/trello.json")
-                modified = False
-                for joke in self.get_trello_jokes():
-                    if joke["id"] in self.jokes:
-                        if joke["text"] == self.jokes[joke["id"]]:
-                            continue
-                        self.jokes[joke["id"]] = joke["text"]
-                        modfiied = True
-                        continue
-                    if joke["id"] not in self.jokes:
-                        self.jokes[joke["id"]] = joke["text"]
-                        modified = True
-                if modified:
-                    logger.info("Joke(s) updated.")
-                    self.mark_for_saving("data/jokes.json")
 
-            time.sleep(self.config["rates"]["trello"])
-
-    def _mentions_loop(self):
-        while self.running:
-            for mention in self.reddit.get_mentions():
-                if mention.id in self.processed["mentions"]:
-                    continue
-                logger.info("Username mentioned by " + mention.author.name + ".")
-                self.reply_to.append(mention)
-                self.processed["mentions"].append(mention.id)
-                self.mark_for_saving("data/processed.json")
-            time.sleep(self.config["rates"]["mentions"])
-
-    def _comment_loop(self):
         for comment in praw.helpers.comment_stream(self.reddit, "all+" + "+".join(self.config["subreddits"]), verbosity=0):
             if not self.running:
                 break
             if comment.id in self.processed["comments"]:
                 continue
             if self.should_reply_to(comment):
-                logger.info("Valid phrase detected in '" + comment.author.name + "'s comment.")
+                log(self.messages["phrase_found"], {"comment": comment})
                 self.reply_to.append(comment)
             self.add_comment_id(comment.id)
             self.mark_for_saving("data/processed.json")
 
-    def _io_loop(self):
+    def stop(self):
+        self.running = False
+
+    def _loop_runner(self, loops, rate):
         while self.running:
-            for file in self.io:
-                if self.io[file]["save"]:
-                    self._save_file(file, self.io[file]["attribute"])
-                    self.io[file]["save"] = False
-            time.sleep(self.config["rates"]["io"])
+            for loop in loops:
+                loop()
+            time.sleep(rate)
+
+    def _trello_loop(self):
+        if self.trello_changed():
+            log(self.messages["trello_changed"])
+            self.mark_for_saving("data/trello.json")
+            modified = False
+            for joke in self.get_trello_jokes():
+                if joke["id"] in self.jokes:
+                    if joke["text"] == self.jokes[joke["id"]]:
+                        continue
+                    self.jokes[joke["id"]] = joke["text"]
+                    modfiied = True
+                    continue
+                if joke["id"] not in self.jokes:
+                    self.jokes[joke["id"]] = joke["text"]
+                    modified = True
+            if modified:
+                log(self.messages["jokes_updated"])
+                self.mark_for_saving("data/jokes.json")
+
+    def _mentions_loop(self):
+        for comment in self.reddit.get_mentions():
+            if comment.id in self.processed["mentions"]:
+                continue
+            log(self.messages["username_mention"], {"comment": comment})
+            self.reply_to.append(comment)
+            self.processed["mentions"].append(comment.id)
+            self.mark_for_saving("data/processed.json")
+
+    def _reply_loop(self):
+        while True:
+            if len(self.reply_to) == 0:
+                break
+            comment = self.reply_to.pop(0)
+            reply = comment.reply(self.get_formated_message(comment))
+            log(self.messages["reply"], {"comment": comment})
+            self.add_comment_id(reply.id)
+            self.mark_for_saving("data/processed.json")
+
+    def _io_loop(self):
+        for file in self.io:
+            if self.io[file]["save"]:
+                self._save_file(file, self.io[file]["attribute"])
+                self.io[file]["save"] = False
+
+    def _uptime_loop(self):
+        log(self.messages["uptime"], {"uptime": self.uptime})
+        self.uptime += self.config["rates"]["uptime"]
 
     def add_comment_id(self, id):
         self.processed["comments"].append(id)
@@ -214,12 +233,16 @@ class TellsYouAJokeBot(object):
         for phrase in self.config["phrases"]:
             if phrase.lower() in comment.body.lower():
                 return True
+        for regex_exp in self.config["regex_expressions"]:
+            if re.search(regex_exp, comment.body):
+                return True
+
         return False
 
-    def get_formated_message(self, parent):
+    def get_formated_message(self, comment):
         return ("\n".join(self.config["reply_message"])
                 .format(joke=self.get_random_joke(),
-                        parent=parent))
+                        comment=comment))
 
     @handle_response("json")
     def _get_children_of_parent(self, parent, auth, parent_type, child):
@@ -279,8 +302,15 @@ class TellsYouAJokeBot(object):
         return self.jokes[random.choice(list(self.jokes.keys()))]
 
 
+def log(message, args=None):
+    if args is None:
+        logger.info(message)
+    else:
+        logger.info(message.format(**args))
+
+
 if __name__ == "__main__":
-    logging_format = logging.Formatter("[%(asctime)s] [%(threadName)s] [%(levelname)s]: %(message)s")
+    logging_format = logging.Formatter("[%(asctime)s] [%(threadName)s]: %(message)s")
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
 
@@ -301,7 +331,7 @@ if __name__ == "__main__":
         bot.stop()
         for file in bot.io:
             if bot.io[file]["save"]:
-                logger.info("Saving data...")
+                log(bot.messages["saving"])
                 bot._save_file(file, bot.io[file]["attribute"])
-            logger.info("Data saved.")
-        logger.info("Bot exited.")
+                log(bot.messages["saved"])
+        log(bot.messages["shutdown"])

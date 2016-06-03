@@ -2,24 +2,31 @@
     "user_agent": "TellsAJokeBot/1.0 by /u/Rascal_Two for /u/palkiajack running everywhere under /u/TellsAJokeBot",
     "username": "",
     "password": "",
+    "rates": {
+        "trello": 60,
+        "mentions": 60,
+        "reply": 60,
+        "io": 60,
+        "uptime": 30
+    },
+    "max_comments": 10000,
+    "shorten_thread_names": true,
     "subreddits": [
     ],
     "ignored_users":[
+        "TellsYouAJokeBot",
         "TerribleJokeBot"
     ],
-    "rates": {
-        "trello": 300,
-        "mentions": 60,
-        "reply": 60,
-        "io": 30
-    },
-    "max_comments": 10000,
     "trello": {
         "boards": [
             {
                 "id": "",
                 "list": "Jokes"
             },
+            {
+                "id": "",
+                "list": "all"
+            }
         ],
         "auth": {
             "required": false,
@@ -28,10 +35,13 @@
         }
     },
     "phrases": [
-        "tell me a joke"
+        "tell me a joke",
+        "funny joke"
+    ],
+    "regex_expressions": [
     ],
     "reply_message": [
-        "[Parent]({parent.permalink})",
+        "Here's a joke just for you {comment.author.name}!",
         "",
         "*****",
         "",
@@ -39,7 +49,9 @@
         "",
         "*****",
         "",
-        "^Read ^about ^me ^at ^/r/TellsYouAJokeBot, ^developed ^by ^/u/Rascal_Two, ^ran ^by ^/u/palkiajack",
+        "*You can summon me by commenting* ***Tell Me A Joke*** *or by mentioning my username!*",
+        "",
+        "^Read ^about ^me ^at ^/r/TellsYouAJokeBot, ^developed ^by ^[\/u/Rascal_Two](https://reddit.com/user/Rascal_Two), ^ran ^by ^[\/u/palkiajack](https://reddit.com/user/palkiajack)",
         ""
     ]
 }
