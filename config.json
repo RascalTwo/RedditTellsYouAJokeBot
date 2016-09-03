@@ -29,7 +29,7 @@
             }
         ],
         "auth": {
-            "required": false,
+            "enabled": false,
             "key": "",
             "token": ""
         }

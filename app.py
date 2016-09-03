@@ -184,7 +184,7 @@ class TellsYouAJokeBot(object):
                     if joke["text"] == self.jokes[joke["id"]]:
                         continue
                     self.jokes[joke["id"]] = joke["text"]
-                    modfiied = True
+                    modified = True
                     continue
                 if joke["id"] not in self.jokes:
                     self.jokes[joke["id"]] = joke["text"]
@@ -264,7 +264,7 @@ class TellsYouAJokeBot(object):
                             .format(target_type, target, auth))
 
     def _get_trello_auth(self, prefix="?"):
-        if self.config["trello"]["auth"]["required"]:
+        if self.config["trello"]["auth"]["enabled"]:
             return ("{}key={}&token={}"
                     .format(prefix,
                             self.config["trello"]["auth"]["key"],

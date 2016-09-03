@@ -56,7 +56,7 @@ The configuration file - `config.json` looks like this:
             }
         ],
         "auth": {
-            "required": false,
+            "enabled": false,
             "key": "",
             "token": ""
         }
@@ -85,7 +85,7 @@ The configuration file - `config.json` looks like this:
             - The list to get the jokes from. If `all`, all cards in the board are pulled as jokes.
     - `auth`
         - Authorization information for viewing non-public boards.
-        - `required`
+        - `enabled`
             - Is authorization enabled.
         - `key`
             - Authorization key.
