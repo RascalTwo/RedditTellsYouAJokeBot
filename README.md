@@ -1,14 +1,12 @@
-*****
-
-# /u/TellsYouAJokeBot
+# TellsYouAJokeBot
 
 *****
 
-Made for /u/palkiajack to run under /u/TellsYouAJokeBot, which tells users a joke when mentioned or a trigger phrase is found.
+Tells users a joke when mentioned or a trigger phrase is found.
 
 *****
 
-# Dependencies
+## Dependencies
 
 *****
 
@@ -20,7 +18,7 @@ You can have the two dependencies automatically installed by executing `pip inst
 
 *****
 
-# Configuration
+## Configuration
 
 *****
 
@@ -28,7 +26,7 @@ The configuration file - `config.json` looks like this:
 
 ```json
 {
-    "user_agent": "TellsYouAJokeBot/1.0 by /u/Rascal_Two for /u/palkiajack running everywhere under /u/TellsYouAJokeBot",
+    "user_agent": "TellsYouAJokeBot/1.0 by /u/Rascal_Two running everywhere under /u/BOT_NAME",
     "username": "",
     "password": "",
     "subreddits": [
@@ -69,9 +67,9 @@ The configuration file - `config.json` looks like this:
 - `user_agent`
     - What reddit identifies the bot as. The more unique this is the better, as common user agents have their rates limited.
 - `username`
-    - Username of /u/TellsYouAJokeBot
+    - Username of /u/BOT_NAME
 - `password`
-    - Password of /u/TellsYouAJokeBot
+    - Password of /u/BOT_NAME
 - `subreddit`
     - Extra subreddits to watch the comments of.
     - Used to watch the comments of subreddits that exclude themselfes from /r/all
@@ -105,7 +103,7 @@ The text within `replay_message` can be templated with the below tags:
 
 *****
 
-# Explanation
+## Explanation
 
 *****
 
@@ -115,7 +113,7 @@ Coming Soon
 
 The bot records all activity to the logs within the `logs` directory.
 
-# TODO
+## TODO
 
 > May do these things, may not do these things.
 

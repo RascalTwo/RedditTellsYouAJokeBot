@@ -1,5 +1,5 @@
 {
-    "user_agent": "TellsAJokeBot/1.0 by /u/Rascal_Two for /u/palkiajack running everywhere under /u/TellsAJokeBot",
+    "user_agent": "TellsAJokeBot/1.0 by /u/Rascal_Two running everywhere under /u/BOT_NAME",
     "username": "",
     "password": "",
     "rates": {
@@ -51,7 +51,7 @@
         "",
         "*You can summon me by commenting* ***Tell Me A Joke*** *or by mentioning my username!*",
         "",
-        "^Read ^about ^me ^at ^/r/TellsYouAJokeBot, ^developed ^by ^[\/u/Rascal_Two](https://reddit.com/user/Rascal_Two), ^ran ^by ^[\/u/palkiajack](https://reddit.com/user/palkiajack)",
+        "^Read ^about ^me ^at ^/r/SUBREDDIT_NAME, ^developed ^by ^[\/u/Rascal_Two](https://reddit.com/user/Rascal_Two), ^ran ^by ^[\/u/USERNAME](https://reddit.com/user/USERNAME)",
         ""
     ]
 }
